@@ -32,6 +32,9 @@
 #include "cpu.h"
 #include "feature/feature_extractor.h"
 #include "feature/feature_collector.h"
+
+#include "propagate_metadata.h"
+
 #include "fex_ctx_vector.h"
 #include "log.h"
 #include "model.h"
@@ -40,6 +43,8 @@
 #include "predict.h"
 #include "thread_pool.h"
 #include "vcs_version.h"
+
+
 
 #ifdef HAVE_CUDA
 #include "libvmaf/libvmaf_cuda.h"
@@ -57,6 +62,7 @@ typedef struct VmafContext {
     VmafFeatureExtractorContextPool *fex_ctx_pool;
     VmafThreadPool *thread_pool;
     VmafFrameSyncContext *framesync;
+    VmafPropagateMetadataContext *metadata_ctx;
 #ifdef HAVE_CUDA
     struct {
         struct {
@@ -106,6 +112,8 @@ int vmaf_init(VmafContext **vmaf, VmafConfiguration cfg)
     if (err) goto free_framesync;
     err = feature_extractor_vector_init(&(v->registered_feature_extractors));
     if (err) goto free_feature_collector;
+    err = vmaf_propagate_metadata_context_init(&(v->metadata_ctx), v->feature_collector);
+    if (err) goto free_metadata_ctx;
 
     if (v->cfg.n_threads > 0) {
         err = vmaf_thread_pool_create(&v->thread_pool, v->cfg.n_threads);
@@ -116,6 +124,8 @@ int vmaf_init(VmafContext **vmaf, VmafConfiguration cfg)
 
     return 0;
 
+free_metadata_ctx:
+    vmaf_propagate_metadata_context_destroy(v->metadata_ctx);
 free_thread_pool:
     vmaf_thread_pool_destroy(v->thread_pool);
 free_feature_extractor_vector:
@@ -904,6 +914,66 @@ int vmaf_score_pooled_model_collection(VmafContext *vmaf,
                                      &score->bootstrap.ci.p95.hi,
                                      index_low, index_high);
 
+    return err;
+}
+
+int vmaf_propagate_metadata(VmafContext *vmaf, void **metadata, const int frame_idx,
+                            void (*on_features_completed)(void **, const char *, char, float))
+{
+    if (!vmaf) return -EINVAL;
+    if (!vmaf->feature_collector) return -EINVAL;
+
+    int err, flag;
+    err = flag = 0;
+    VmafPropagateMetadataContext *ctx = vmaf->metadata_ctx;
+
+    if (vmaf->feature_collector->cnt == 0) {
+        printf("No feature extractor registered\n");
+        vmaf_frame_queue_push(ctx, frame_idx);
+        return err;
+    }
+
+    // TODO: This is a temporary solution, it should be changed
+    // Basically it is waits for all the feature extractors to be initialized
+    //
+    // Q: Why does this?
+    // A: This is a implementation choice, if we don't wait this and our queue has frames inside of it, it is going to propagate
+    // metadata with ready feature extractors and pop the frame. For example; we have normally 11 feature extractors and at the starting
+    // most of time 2 or 3 of them are ready, so if we continue, it going to propagate those scores and pop the frame which doesnt wait the
+    // remaining ones.
+    for (unsigned f = 0; f < vmaf->feature_collector->cnt; f++) {
+        unsigned i;
+        flag = 0;
+        for (i = 0; i < vmaf->registered_feature_extractors.cnt; i++) {
+            VmafFeatureExtractorContext *fex_ctx = vmaf->registered_feature_extractors.fex_ctx[i];
+            if (fex_ctx->fex->flags & VMAF_FEATURE_EXTRACTOR_CUDA) // It might not be necessary
+                continue;
+            if (strstr(vmaf->feature_collector->feature_vector[f]->name, fex_ctx->fex->name) != NULL) {
+                break;
+            } else {
+                flag++;
+            }
+        }
+        // vmaf->feature_collector->cnt != 11 is hardcoded for now, it supposed to be decided on the fly
+        // they are fixed but it might change depends on the mode
+        if (flag == vmaf->registered_feature_extractors.cnt || vmaf->feature_collector->cnt != 11) {
+            vmaf_frame_queue_push(ctx, frame_idx);
+            printf("Feature extractor not ready\n");
+            return err; // Might use a different error code for this
+        }
+    }
+
+    vmaf_frame_queue_push(ctx, frame_idx);
+    while (ctx->frame_queue->head != NULL) {
+        VmafFrame frame = vmaf_frame_queue_head(ctx);
+        err = vmaf_feature_collector_propagate_metadata(ctx, frame.frame_idx,
+                                                on_features_completed);
+        if (err) {
+            printf("Error in propagating metadata\n");
+            return err;
+        }
+        vmaf_frame_queue_pop(ctx);
+    }
     return err;
 }
 
