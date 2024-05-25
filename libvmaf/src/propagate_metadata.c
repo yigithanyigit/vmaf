@@ -30,12 +30,12 @@ int vmaf_propagate_metadata_context_destroy(VmafPropagateMetadataContext *ctx)
 {
     if (!ctx) return -EINVAL;
 
-    pthread_mutex_destroy(&(ctx->lock));
     while (ctx->frame_queue->head) {
         VmafFrame frame = vmaf_frame_queue_pop(ctx);
     }
     free(ctx->frame_queue);
     free(ctx);
+    pthread_mutex_destroy(&(ctx->lock));
 
     return 0;
 }
