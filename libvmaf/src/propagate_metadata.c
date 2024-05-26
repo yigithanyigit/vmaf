@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 #include "propagate_metadata.h"
 #include "dict.h"
 #include "errno.h"
@@ -140,7 +141,7 @@ VmafFrame vmaf_frame_queue_head(VmafPropagateMetadataContext *ctx)
     return popped_frame;
 }
 
-int vmaf_feature_collector_propagate_metadata(VmafPropagateMetadataContext *ctx, const int frame_idx, void (*on_features_completed)(void **, const char *, char, float))
+int vmaf_feature_collector_propagate_metadata(VmafPropagateMetadataContext *ctx, const int frame_idx, void **metadata, void (*on_features_completed)(void **, const char *, const char *))
 {
     if (!ctx) return -EINVAL;
     if (!ctx->fc)  return -EINVAL;
@@ -156,10 +157,10 @@ int vmaf_feature_collector_propagate_metadata(VmafPropagateMetadataContext *ctx,
         if (err) {
             return -12; // Arbitrary error code that I defined
         }
-    }
-    for (i = 0; i < fc->cnt; i++) {
-        err = vmaf_feature_collector_get_score(fc, fc->feature_vector[i]->name, &score, frame_idx);
-        printf("Feature Index: %d Feature name: %s, score: %f\n", frame_idx, fc->feature_vector[i]->name, score);
+        //printf("Feature Index: %d Feature name: %s, score: %f\n", frame_idx, fc->feature_vector[i]->name, score);
+        char value[128];
+        snprintf(value, sizeof(value), "%.6f", score);
+        on_features_completed(metadata, fc->feature_vector[i]->name, value);
     }
 
     return 0;

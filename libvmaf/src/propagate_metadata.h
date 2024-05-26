@@ -35,6 +35,6 @@ int vmaf_frame_queue_init(VmafFrameQueue **frame_queue);
 
 VmafFrame vmaf_frame_queue_head(VmafPropagateMetadataContext *ctx);
 
-int vmaf_feature_collector_propagate_metadata(VmafPropagateMetadataContext *ctx, const int frame_idx, void (*on_features_completed)(void **, const char *, char, float));
+int vmaf_feature_collector_propagate_metadata(VmafPropagateMetadataContext *ctx, const int frame_idx, void **metadata, void (*on_features_completed)(void **, const char *, const char *));
 
 #endif

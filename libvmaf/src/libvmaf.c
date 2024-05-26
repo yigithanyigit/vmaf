@@ -966,7 +966,7 @@ int vmaf_propagate_metadata(VmafContext *vmaf, void **metadata, const int frame_
     vmaf_frame_queue_push(ctx, frame_idx);
     while (ctx->frame_queue->head != NULL) {
         VmafFrame frame = vmaf_frame_queue_head(ctx);
-        err = vmaf_feature_collector_propagate_metadata(ctx, frame.frame_idx,
+        err = vmaf_feature_collector_propagate_metadata(ctx, frame.frame_idx, metadata,
                                                 on_features_completed);
         if (err) {
             printf("Error in propagating metadata\n");
