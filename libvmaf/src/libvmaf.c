@@ -929,7 +929,7 @@ int vmaf_propagate_metadata(VmafContext *vmaf, void **metadata, const int frame_
 
     if (vmaf->feature_collector->cnt == 0) {
         printf("No feature extractor registered\n");
-        vmaf_frame_queue_push(ctx, frame_idx);
+        err = vmaf_frame_queue_push(ctx, frame_idx);
         return err;
     }
 
@@ -957,22 +957,31 @@ int vmaf_propagate_metadata(VmafContext *vmaf, void **metadata, const int frame_
         // vmaf->feature_collector->cnt != 11 is hardcoded for now, it supposed to be decided on the fly
         // they are fixed but it might change depends on the mode
         if (flag == vmaf->registered_feature_extractors.cnt || vmaf->feature_collector->cnt != 11) {
-            vmaf_frame_queue_push(ctx, frame_idx);
+            err |= vmaf_frame_queue_push(ctx, frame_idx);
             printf("Feature extractor not ready\n");
-            return err; // Might use a different error code for this
+            return -EBUSY; // Might use a different error code for this
         }
     }
 
-    vmaf_frame_queue_push(ctx, frame_idx);
+    err |= vmaf_frame_queue_push(ctx, frame_idx);
+    if (err) {
+        printf("Error in pushing frame to queue\n");
+        return err;
+    }
     while (ctx->frame_queue->head != NULL) {
         VmafFrame frame = vmaf_frame_queue_head(ctx);
-        err = vmaf_feature_collector_propagate_metadata(ctx, frame.frame_idx, metadata,
+        err |= vmaf_feature_collector_propagate_metadata(ctx, frame.frame_idx, metadata,
                                                 on_features_completed);
-        if (err) {
+        // TODO: Handle That '-12' arbitrary error code
+        if (err && err != -12) {
             printf("Error in propagating metadata\n");
             return err;
         }
-        vmaf_frame_queue_pop(ctx);
+        if (err != -12) {
+            vmaf_frame_queue_pop(ctx);
+            continue;
+        }
+        break;
     }
     return err;
 }
