@@ -70,9 +70,11 @@ void set_meta(void *data, VmafMetadata *metadata)
 {
     if (!data) return;
     MetaStruct *meta = data;
-    char value[128];
-    snprintf(value, sizeof(value), "%f", metadata->value);
-    vmaf_dictionary_set(meta->metadata, metadata->key, value, meta->flags);
+    char key[128], value[128];
+    snprintf(key, sizeof(value), "%s_%d", metadata->feature_name,
+             metadata->picture_index);
+    snprintf(value, sizeof(value), "%f", metadata->score);
+    vmaf_dictionary_set(meta->metadata, key, value, meta->flags);
 }
 
 static char* test_propagate_metadata()
@@ -86,6 +88,7 @@ static char* test_propagate_metadata()
     };
 
     VmafMetadataConfiguration m = {
+        .feature_name = "vmaf",
         .callback = set_meta,
         .data     = &meta_data,
     };
@@ -95,7 +98,7 @@ static char* test_propagate_metadata()
     mu_assert("problem during vmaf_feature_collector_init", !err);
 
     err = vmaf_feature_collector_register_metadata(feature_collector, m);
-    mu_assert("problem during vmaf_feature_collector_register_metadata", !err);
+    mu_assert("problem during vmaf_feature_collector_register_metadata_0", !err);
 
     VmafModel *model;
     VmafModelConfig cfg = {
@@ -114,6 +117,10 @@ static char* test_propagate_metadata()
     }
 
     VmafDictionaryEntry *e = vmaf_dictionary_get(&dict, "vmaf_0", 0);
+    mu_assert("error on propagaton metadata: propagated key not found!",
+              e);
+    mu_assert("error on propagaton metadata: propagated key wrong!",
+              !strcmp(e->key, "vmaf_0"));
     mu_assert("error on propagaton metadata: propagated data wrong!",
               !strcmp(e->val, "100.000000"));
 
@@ -124,7 +131,7 @@ static char* test_propagate_metadata()
     mu_assert("problem during vmaf_feature_collector_init", !err);
 
     err = vmaf_feature_collector_register_metadata(feature_collector, m);
-    mu_assert("problem during vmaf_feature_collector_register_metadata", !err);
+    mu_assert("problem during vmaf_feature_collector_register_metadata_1", !err);
 
     for (unsigned i = 0; i < model->n_features; i++) {
         err = vmaf_feature_collector_append(feature_collector,
@@ -139,7 +146,7 @@ static char* test_propagate_metadata()
     mu_assert("problem during vmaf_feature_collector_init", !err);
 
     err = vmaf_feature_collector_register_metadata(feature_collector, m);
-    mu_assert("problem during vmaf_feature_collector_register_metadata", err);
+    mu_assert("problem during vmaf_feature_collector_register_metadata_2", err);
 
     vmaf_feature_collector_destroy(feature_collector);
 
