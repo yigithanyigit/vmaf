@@ -348,29 +348,24 @@ int vmaf_feature_collector_append(VmafFeatureCollector *feature_collector,
     VmafCallbackItem *metadata_iter = feature_collector->metadata ?
                                       feature_collector->metadata->head : NULL;
     while (metadata_iter) {
-        double score = 0.f;
+        // Check current feature name is the same as the metadata feature name
+        if (!strcmp(metadata_iter->metadata_cfg.feature_name, feature_name)) {
 
-        pthread_mutex_unlock(&(feature_collector->lock));
-        res = vmaf_feature_collector_get_score(feature_collector,
-                metadata_iter->metadata_cfg.feature_name,
-                &score, picture_index);
-        pthread_mutex_lock(&(feature_collector->lock));
-
-        if (!res) {
-            if (!strcmp(metadata_iter->metadata_cfg.feature_name, feature_name)) {
-
-                VmafMetadata data = {
-                    .feature_name = metadata_iter->metadata_cfg.feature_name,
-                    .picture_index = picture_index,
-                    .score = score,
-                };
-                metadata_iter->metadata_cfg.callback(metadata_iter->metadata_cfg.data, &data);
-            }
+            // Call the callback function with the metadata feature name
+            VmafMetadata data = {
+                .feature_name = metadata_iter->metadata_cfg.feature_name,
+                .picture_index = picture_index,
+                .score = score,
+            };
+            metadata_iter->metadata_cfg.callback(metadata_iter->metadata_cfg.data, &data);
+            // Move to the next metadata
             goto next_metadata;
         }
 
         VmafPredictModel *model_iter = feature_collector->models;
 
+        // If metadata feature name is not the same as the current feature feature_name
+        // Check if metadata feature name is the predicted feature
         while (model_iter) {
             VmafModel *model = model_iter->model;
 
