@@ -257,9 +257,6 @@ typedef struct VmafMetadata {
     char *feature_name;
     unsigned picture_index;
     double score;
-
-    char *key;
-    double value;
 } VmafMetadata;
 
 typedef struct VmafMetadataConfiguration {
