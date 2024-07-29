@@ -348,38 +348,38 @@ int vmaf_feature_collector_append(VmafFeatureCollector *feature_collector,
     VmafCallbackItem *metadata_iter = feature_collector->metadata ?
                                       feature_collector->metadata->head : NULL;
     while (metadata_iter) {
+        double score = 0.f;
+        pthread_mutex_unlock(&(feature_collector->lock));
+        res = vmaf_feature_collector_get_score(feature_collector,
+                metadata_iter->metadata_cfg.feature_name,
+                &score, picture_index);
+        pthread_mutex_lock(&(feature_collector->lock));
+
+        if (!res) goto next_metadata;
+
         VmafPredictModel *model_iter = feature_collector->models;
         while (model_iter) {
             VmafModel *model = model_iter->model;
-
-            pthread_mutex_unlock(&(feature_collector->lock));
-            res = vmaf_feature_collector_get_score(feature_collector,
-                    metadata_iter->metadata_cfg.feature_name,
-                    &score, picture_index);
-            pthread_mutex_lock(&(feature_collector->lock));
-
-            if (!res) {
-                model_iter = model_iter->next;
-                continue;
-            }
 
             pthread_mutex_unlock(&(feature_collector->lock));
             res = vmaf_predict_score_at_index(model, feature_collector,
                     picture_index, &score, true, true, 0);
             pthread_mutex_lock(&(feature_collector->lock));
 
-            if (res) goto unlock;
+            if (!res) {
 
-            VmafMetadata data = {
-                .feature_name = metadata_iter->metadata_cfg.feature_name,
-                .picture_index = picture_index,
-                .score = score,
-            };
+                VmafMetadata data = {
+                    .feature_name = metadata_iter->metadata_cfg.feature_name,
+                    .picture_index = picture_index,
+                    .score = score,
+                };
 
-            metadata_iter->metadata_cfg.callback(metadata_iter->metadata_cfg.data, &data);
+                metadata_iter->metadata_cfg.callback(metadata_iter->metadata_cfg.data, &data);
+            }
+
             model_iter = model_iter->next;
         }
-
+next_metadata:
         metadata_iter = metadata_iter->next;
     }
 
