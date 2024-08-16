@@ -48,6 +48,10 @@ typedef struct VmafFeatureCollector {
     unsigned cnt, capacity;
     struct { clock_t begin, end; } timer;
     pthread_mutex_t lock;
+
+    // GSOC 2024: Last Accessed index per feature vector.
+    int *last_accesed_index; //TODO: ATOMIC?
+    // End GSOC 2024
 } VmafFeatureCollector;
 
 int vmaf_feature_collector_init(VmafFeatureCollector **const feature_collector);

@@ -131,6 +131,12 @@ test_framesync = executable('test_framesync',
     dependencies : thread_lib,
 )
 
+test_propagate_metadata = executable('test_propagate_metadata',
+    ['test.c', 'test_propagate_metadata.c', '../src/propagate_metadata.c'],
+    include_directories : [libvmaf_inc, test_inc, include_directories('../src/'), include_directories('../src/feature/')],
+    link_with : get_option('default_library') == 'both' ? libvmaf.get_static_lib() : libvmaf,
+)
+
 if get_option('enable_cuda')
 test_ring_buffer = executable('test_ring_buffer',
     ['test.c', 'test_ring_buffer.c', '../src/cuda/ring_buffer.c', '../src/cuda/picture_cuda.c'],
@@ -167,4 +173,5 @@ test('test_cambi', test_cambi)
 test('test_luminance_tools', test_luminance_tools)
 test('test_cli_parse', test_cli_parse)
 test('test_psnr', test_psnr)
+test('test_propagate_metadata', test_propagate_metadata)
 test('test_framesync', test_framesync)

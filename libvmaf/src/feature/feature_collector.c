@@ -211,6 +211,13 @@ int vmaf_feature_collector_init(VmafFeatureCollector **const feature_collector)
     fc->feature_vector = malloc(sizeof(*(fc->feature_vector)) * fc->capacity);
     if (!fc->feature_vector) goto free_fc;
     memset(fc->feature_vector, 0, sizeof(*(fc->feature_vector)) * fc->capacity);
+
+    // GSOC 2024: Added for keeping track of last accesed feature vector
+    fc->last_accesed_index = malloc(sizeof(int) * fc->capacity);
+    if (!fc->last_accesed_index) goto free_feature_vector;
+    memset(fc->last_accesed_index, 0, sizeof(int) * fc->capacity);
+    // END GSOC 2024
+
     err = aggregate_vector_init(&fc->aggregate_vector);
     if (err) goto free_feature_vector;
     err = pthread_mutex_init(&(fc->lock), NULL);
@@ -273,8 +280,26 @@ int vmaf_feature_collector_append(VmafFeatureCollector *feature_collector,
             }
             memset(fv + feature_collector->capacity, 0, initial_size);
             feature_collector->feature_vector = fv;
+
+            // GSOC 2024: Added for keeping track of last accesed feature vector
+            initial_size = sizeof(feature_collector->last_accesed_index[0]) *
+                feature_vector->capacity;
+            int *last_accessed_index =
+                realloc(feature_collector->last_accesed_index,
+                sizeof(*(feature_collector->last_accesed_index)) *
+                initial_size * 2);
+            if (!last_accessed_index) {
+                err = -ENOMEM;
+                goto unlock;
+            }
+            memset(last_accessed_index + feature_collector->capacity, 0, initial_size);
+            feature_collector->last_accesed_index = last_accessed_index;
+            // END GSOC 2024
+
             feature_collector->capacity *= 2;
         }
+        feature_collector->last_accesed_index[feature_collector->cnt] = 0;
+
         feature_collector->feature_vector[feature_collector->cnt++]
             = feature_vector;
     }
